@@ -1,6 +1,6 @@
 # RESO ERD Generator
 
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Author:** Dan Troup | CEO | Broker Public Portal
 
 A simple Python script that generates a Mermaid Entity Relationship Diagram (ERD) from the RESO Data Dictionary, showing only primary keys and foreign keys with their relationships.
@@ -15,7 +15,8 @@ A simple Python script that generates a Mermaid Entity Relationship Diagram (ERD
 ## Files
 
 - `reso_erd.py` - Main Python script
-- `reso_erd.md` - Generated Mermaid ERD
+- `reso_erd.md` - Generated Mermaid ERD (full version)
+- `reso_erd_no_orphans.md` - Generated Mermaid ERD (without orphaned entities)
 - `requirements.txt` - Python dependencies
 
 ## Setup
@@ -27,19 +28,33 @@ A simple Python script that generates a Mermaid Entity Relationship Diagram (ERD
 
 2. Run the script:
    ```bash
+   # Generate full ERD with all entities
    python3 reso_erd.py
+   
+   # Generate ERD without orphaned entities (entities with no relationships)
+   python3 reso_erd.py --no-orphans
    ```
 
 3. View the generated ERD:
-   - Open `reso_erd.md` to see the Mermaid diagram
+   - Open `reso_erd.md` to see the full Mermaid diagram (41 entities)
+   - Open `reso_erd_no_orphans.md` to see the filtered diagram (21 entities)
    - Copy the Mermaid code to any Mermaid viewer (GitHub, Mermaid Live Editor, etc.)
 
 ## Output
 
-The script generates:
+The script generates two versions:
+
+### Full ERD (`reso_erd.md`)
 - **41 entities** with primary keys and foreign keys
 - **14 relationships** showing connections between tables
-- **Clean Mermaid syntax** ready for visualization
+- **20 orphaned entities** (entities with no relationships)
+
+### Filtered ERD (`reso_erd_no_orphans.md`)
+- **21 entities** with relationships only
+- **14 relationships** showing connections between tables
+- **No orphaned entities** for cleaner visualization
+
+Both versions use **clean Mermaid syntax** ready for visualization.
 
 ## Data Sources
 

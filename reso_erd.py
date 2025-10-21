@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 RESO Simple ERD Generator
-Version: 1.0.0
+Version: 1.1.0
 Author: Dan Troup | CEO | Broker Public Portal
 
 Creates a clean Mermaid ERD with only primary keys and foreign keys.
@@ -15,16 +15,21 @@ Data Sources:
 - RESO XML Schema: https://raw.githubusercontent.com/RESOStandards/web-api-commander/refs/heads/main/src/main/resources/RESODataDictionary-2.0.xml
 
 Usage:
-    python3 reso_erd.py
+    python3 reso_erd.py [--no-orphans]
+    
+Options:
+    --no-orphans    Exclude entities with no relationships (orphaned entities)
 
 Output:
     reso_erd.md - Generated Mermaid ERD with 41 entities and 14 relationships
+    reso_erd_no_orphans.md - ERD without orphaned entities (when --no-orphans is used)
 """
 
 import requests
 import pandas as pd
 import io
 import re
+import argparse
 from dataclasses import dataclass
 from typing import List, Dict, Optional
 
@@ -42,8 +47,9 @@ class Entity:
     foreign_keys: List[Field]
 
 class RESOSimpleERD:
-    def __init__(self):
+    def __init__(self, exclude_orphans=False):
         self.entities = {}
+        self.exclude_orphans = exclude_orphans
         
     def fetch_data(self):
         """Fetch data from RESO Data Dictionary"""
@@ -134,8 +140,13 @@ class RESOSimpleERD:
         """Generate simple Mermaid ERD with only keys"""
         mermaid_lines = ["erDiagram"]
         
+        # Filter entities if excluding orphans
+        entities_to_process = self.entities
+        if self.exclude_orphans:
+            entities_to_process = self._get_connected_entities()
+        
         # Generate entity definitions with only keys
-        for entity_name, entity in self.entities.items():
+        for entity_name, entity in entities_to_process.items():
             mermaid_lines.append(f"    {entity_name} {{")
             
             # Add primary key
@@ -176,21 +187,70 @@ class RESOSimpleERD:
         
         return relationships
     
+    def _get_connected_entities(self) -> Dict:
+        """Get entities that have relationships (not orphaned)"""
+        connected_entities = {}
+        
+        # Get all entities that are referenced by foreign keys
+        referenced_entities = set()
+        for entity in self.entities.values():
+            for fk in entity.foreign_keys:
+                if fk.target_resource:
+                    # Find the entity that has this as primary key
+                    for name, ent in self.entities.items():
+                        if ent.primary_key == fk.target_resource:
+                            referenced_entities.add(name)
+                            break
+        
+        # Get all entities that have foreign keys (they reference others)
+        entities_with_fks = set()
+        for name, entity in self.entities.items():
+            if entity.foreign_keys:
+                entities_with_fks.add(name)
+        
+        # Connected entities are those that either reference others or are referenced
+        connected_names = referenced_entities.union(entities_with_fks)
+        
+        for name in connected_names:
+            if name in self.entities:
+                connected_entities[name] = self.entities[name]
+        
+        return connected_entities
+    
     def save_mermaid(self):
         """Save Mermaid diagram to file"""
         mermaid_content = self.generate_mermaid_erd()
         
-        with open('reso_erd.md', 'w') as f:
-            f.write("# RESO Simple ERD\n\n")
-            f.write("Mermaid ERD with only primary keys and foreign keys.\n\n")
+        # Determine output filename
+        if self.exclude_orphans:
+            filename = 'reso_erd_no_orphans.md'
+            title = "RESO Simple ERD (No Orphans)"
+            description = "Mermaid ERD with only primary keys and foreign keys, excluding orphaned entities."
+        else:
+            filename = 'reso_erd.md'
+            title = "RESO Simple ERD"
+            description = "Mermaid ERD with only primary keys and foreign keys."
+        
+        with open(filename, 'w') as f:
+            f.write(f"# {title}\n\n")
+            f.write(f"{description}\n\n")
             f.write("```mermaid\n")
             f.write(mermaid_content)
             f.write("\n```\n")
         
-        print(f"\n✅ Simple ERD saved to 'reso_erd.md'")
-        print(f"📊 Total entities: {len(self.entities)}")
-        print(f"🔑 Entities with PKs: {len([e for e in self.entities.values() if e.primary_key != 'Not found'])}")
+        # Calculate stats
+        entities_to_count = self.entities
+        if self.exclude_orphans:
+            entities_to_count = self._get_connected_entities()
+        
+        print(f"\n✅ Simple ERD saved to '{filename}'")
+        print(f"📊 Total entities: {len(entities_to_count)}")
+        print(f"🔑 Entities with PKs: {len([e for e in entities_to_count.values() if e.primary_key != 'Not found'])}")
         print(f"🔗 Total relationships: {len(self._extract_relationships())}")
+        
+        if self.exclude_orphans:
+            orphaned_count = len(self.entities) - len(entities_to_count)
+            print(f"🚫 Orphaned entities excluded: {orphaned_count}")
     
     def run(self):
         """Run the complete process"""
@@ -199,5 +259,11 @@ class RESOSimpleERD:
         self.save_mermaid()
 
 if __name__ == "__main__":
-    generator = RESOSimpleERD()
+    parser = argparse.ArgumentParser(description='Generate RESO ERD with optional orphan exclusion')
+    parser.add_argument('--no-orphans', action='store_true', 
+                       help='Exclude entities with no relationships (orphaned entities)')
+    
+    args = parser.parse_args()
+    
+    generator = RESOSimpleERD(exclude_orphans=args.no_orphans)
     generator.run()
