@@ -202,14 +202,22 @@ class RESOSimpleERD:
                             referenced_entities.add(name)
                             break
         
-        # Get all entities that have foreign keys (they reference others)
-        entities_with_fks = set()
+        # Get all entities that have foreign keys that actually point to other entities
+        entities_with_valid_fks = set()
         for name, entity in self.entities.items():
-            if entity.foreign_keys:
-                entities_with_fks.add(name)
+            has_valid_fk = False
+            for fk in entity.foreign_keys:
+                if fk.target_resource:
+                    # Check if this FK points to an actual entity primary key
+                    for ent_name, ent in self.entities.items():
+                        if ent.primary_key == fk.target_resource:
+                            has_valid_fk = True
+                            break
+            if has_valid_fk:
+                entities_with_valid_fks.add(name)
         
         # Connected entities are those that either reference others or are referenced
-        connected_names = referenced_entities.union(entities_with_fks)
+        connected_names = referenced_entities.union(entities_with_valid_fks)
         
         for name in connected_names:
             if name in self.entities:
